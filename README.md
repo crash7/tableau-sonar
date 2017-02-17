@@ -2,6 +2,9 @@
 
 Web Data Connector to retrieve data from Sonar.
 
+![screenshoot](https://cloud.githubusercontent.com/assets/1450075/23081446/99477c64-f533-11e6-8137-61131b895714.png)
+
+
 ## Troubleshooting
 
 ### The Sonar server doesn't send the `Access-Control-Allow-Origin` header
