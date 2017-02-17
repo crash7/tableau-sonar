@@ -119,7 +119,7 @@
 
         });
 
-        tableau.connectionName = 'Sonar Data';
+        tableau.connectionName = 'Sonar Data - ' + connectionData['sonar-projectkey'];
 
         tableau.connectionData = JSON.stringify(connectionData);
     }
