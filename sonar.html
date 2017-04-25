@@ -7,7 +7,7 @@
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js" type="text/javascript"></script>
         <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
         <script src="https://connectors.tableau.com/libs/tableauwdc-2.2.latest.js" type="text/javascript"></script>
-        <script src="sonar.js?20170425-9" type="text/javascript"></script>
+        <script src="sonar.js?20170425-10" type="text/javascript"></script>
     </head>
     <body>
         <div class="container container-table">
@@ -66,6 +66,30 @@
                           <label>
                             <input name="sonar-metrics[violations]" data-name="violations" type="checkbox">
                             Violations
+                          </label>
+                        </div>
+                        <div class="checkbox">
+                          <label>
+                            <input name="sonar-metrics[vulnerabilities]" data-name="vulnerabilities" type="checkbox">
+                            Vulnerabilities
+                          </label>
+                        </div>
+                        <div class="checkbox">
+                          <label>
+                            <input name="sonar-metrics[bugs]" data-name="bugs" type="checkbox">
+                            Bugs
+                          </label>
+                        </div>
+                        <div class="checkbox">
+                          <label>
+                            <input name="sonar-metrics[code_smells]" data-name="code_smells" type="checkbox">
+                            Code smells
+                          </label>
+                        </div>
+                        <div class="checkbox">
+                          <label>
+                            <input name="sonar-metrics[sqale_index]" data-name="code_smells_debt" type="checkbox">
+                            Code Smells tech debt
                           </label>
                         </div>
                     </div>
