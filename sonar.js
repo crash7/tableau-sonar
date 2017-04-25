@@ -1,138 +1,168 @@
 (function($, tableau) {
-    var $sonarForm;
-    var apiEndpoints = {};
+    var schemaGenerators;
+    var dataRetrievers;
     var mySonarConnector = tableau.makeConnector();
 
-    // api endpoints for select combo
-    apiEndpoints.authors = function getAuthors(sonarAPI, connectionData, callback) {
-        $.getJSON(sonarAPI + 'issues/authors', { ps: 500 }, function(response) {
-            var collection = response.authors;
-            var tableData = [];
+    /**
+     * Set of schema generators to support multiple tables/inputs
+     * - authors
+     * - timemachine
+     */
+    schemaGenerators = {
+        authors: function generateAuthorsSchema() {
+            return {
+                id: 'authors',
+                alias: 'Authors',
+                columns: [
+                    { id: 'email', dataType: tableau.dataTypeEnum.string }
+                ]
+            };
+        },
 
-            // Iterate over the JSON object
-            for (var i = 0, len = collection.length; i < len; i++) {
-                tableData.push({
-                    'email': collection[i]
-                });
+        timemachine: function generateTimeMachineSchema(projectKey, metrics) {
+            var i;
+            var template = {
+                id: 'timemachine__' + projectKey,
+                alias: 'TimeMachine - ' + projectKey,
+                columns: [
+                    { id: 'date', dataType: tableau.dataTypeEnum.datetime }
+                ]
+            };
+            for (i = 0; i < metrics.length; i++) {
+                template.columns.push({ id: metrics[i], dataType: tableau.dataTypeEnum.float });
             }
-
-            callback(tableData);
-        });
+            return template;
+        }
     };
-    apiEndpoints.timemachine = function getCoverage(sonarAPI, connectionData, callback) {
-        $.getJSON(sonarAPI + 'timemachine/index', {
-            resource: connectionData['sonar-projectkey'],
-            metrics: connectionData.metrics.join(',')
-        }, function(response) {
-            var collection = response[0].cells;
-            var tableData = [];
 
-            // Iterate over the JSON object
-            for (var i = 0, len = collection.length; i < len; i++) {
-                var row = {
-                    'date': collection[i].d.slice(0, 19).replace('T', ' ')
-                };
-                for(var m = 0; m < connectionData.metrics.length; m++) {
-                    row[connectionData.metrics[m]] = collection[i].v[m];
+    /**
+     * Set of data retrievers
+     * - authors
+     * - timemachine
+     */
+    dataRetrievers = {
+        authors: function retrieveAuthorsData(sonarAPI, projectKey, connectionData, callback) {
+            // TODO: support more that 500 authors, retrieve data recursively
+            $.getJSON(sonarAPI + 'issues/authors', { ps: 500 }, function(response) {
+                var collection = response.authors;
+                var tableData = [];
+                var i;
+
+                // Iterate over the JSON object
+                for (i = 0, len = collection.length; i < len; i++) {
+                    tableData.push({ 'email': collection[i] });
                 }
-                tableData.push(row);
-            }
 
-            callback(tableData);
-        });
+                callback(tableData);
+            });
+        },
+
+        timemachine: function retrieveTimeMachineData(sonarAPI, projectKey, connectionData, callback) {
+            $.getJSON(sonarAPI + 'timemachine/index', {
+                resource: projectKey,
+                metrics: connectionData.metrics.join(',')
+            }, function(response) {
+                var collection = response[0].cells;
+                var tableData = [];
+
+                // Iterate over the JSON object
+                for (var i = 0, len = collection.length; i < len; i++) {
+                    var row = {
+                        'date': collection[i].d.slice(0, 19).replace('T', ' ')
+                    };
+                    for(var m = 0; m < connectionData.metrics.length; m++) {
+                        row[connectionData.metrics[m]] = collection[i].v[m];
+                    }
+                    tableData.push(row);
+                }
+
+                callback(tableData);
+            });
+        }
     };
 
-
-    // Define the schema
+    /**
+     * Defines the schemas based on the connectionData
+     */
     mySonarConnector.getSchema = function(schemaCallback) {
         var connectionData = JSON.parse(tableau.connectionData);
+        var schemas = [];
+        var i;
 
-        var authors = {
-            id: "authors",
-            alias: "Authors",
-            columns: [
-                {
-                    id: 'email',
-                    dataType: tableau.dataTypeEnum.string
-                }
-            ]
-        };
+        if (connectionData.endpoints.authors) {
+            schemas.push(schemaGenerators.authors());
+        }
 
-        var timemachine = {
-            id: "timemachine",
-            alias: "TimeMachine",
-            columns: [
-                {
-                    id: 'date',
-                    dataType: tableau.dataTypeEnum.datetime
-                }
-            ]
-        };
-        tableau.log(connectionData)
-        // update timeMachine schema
         if (connectionData.endpoints.timemachine) {
-            for (var i=0; i < connectionData.metrics.length; i++) {
-                timemachine.columns.push({
-                    id: connectionData.metrics[i],
-                    dataType: tableau.dataTypeEnum.float
-                });
+            for (i=0; i<connectionData.projectKeys.length; i++) {
+                schemas.push(
+                    schemaGenerators.timemachine(
+                        connectionData.projectKeys[i],
+                        connectionData.metrics
+                    )
+                );
             }
         }
 
-        schemaCallback([ authors, timemachine ]);
+        schemaCallback(schemas);
     };
 
-    // Download the data
+    /**
+     * Download the data
+     */
     mySonarConnector.getData = function(table, doneCallback) {
-        var sonarAPI = '/api/'
+        var sonarAPI = '/api/';
         var connectionData = JSON.parse(tableau.connectionData);
+        var processedId = table.tableInfo.id.split('__');
 
         sonarAPI = connectionData['sonar-url'] + sonarAPI;
 
-        apiEndpoints[table.tableInfo.id](sonarAPI, connectionData, function(tableData) {
+        dataRetrievers[processedId[0]](sonarAPI, processedId[1], connectionData, function(tableData) {
             table.appendRows(tableData);
             doneCallback();
         });
     };
 
-    tableau.registerConnector(mySonarConnector);
+    function onLoad() {
+        var $sonarForm = $('#sonar-form');
 
-    function storeConnectionData() {
-        var connectionData = {
-            endpoints: {},
-            metrics: []
-        };
+        $sonarForm.submit(function (event) {
+            var connectionData = {
+                endpoints: {},
+                metrics: [],
+                projectKeys: []
+            };
 
-        $sonarForm.find('input, select').each(function(index, element) {
-            switch (true) {
-                case /sonar-endpoints/.test(element.name):
-                    connectionData['endpoints'][element.getAttribute('data-name')] = element.checked;
-                    break;
-                case /sonar-metrics/.test(element.name):
-                    if(element.checked) {
-                        connectionData['metrics'].push(element.getAttribute('data-name'));
-                    }
-                    break;
-                default:
-                    connectionData[element.name] = element.type === 'checkbox' ? element.checked : element.value;
-            }
-
-        });
-
-        tableau.connectionName = 'Sonar Data - ' + connectionData['sonar-projectkey'];
-
-        tableau.connectionData = JSON.stringify(connectionData);
-    }
-
-    // Create event listeners
-    $(document).ready(function() {
-        $sonarForm = $('#sonar-form');
-        $sonarForm.submit(function(event) {
             event.preventDefault();
 
-            storeConnectionData();
+            $sonarForm.find('input, select').each(function (index, element) {
+                switch (true) {
+                    case /sonar-endpoints/.test(element.name):
+                        connectionData['endpoints'][element.getAttribute('data-name')] = element.checked;
+                        break;
+                    case /sonar-metrics/.test(element.name):
+                        if(element.checked) {
+                            connectionData['metrics'].push(element.getAttribute('data-name'));
+                        }
+                        break;
+                    case /sonar-projectkeys/.test(element.name):
+                        connectionData.projectKeys = element.value.split(',');
+                        break;
+                    default:
+                        if (element.type === 'checkbox') {
+                            connectionData[element.name] = element.checked;
+                        } else {
+                            connectionData[element.name] = element.value;
+                        }
+                }
+            });
 
+            tableau.connectionName = 'Sonar WDC - ' + connectionData['sonar-url'];
+            tableau.connectionData = JSON.stringify(connectionData);
             tableau.submit();
         });
-    });
+    }
+
+    tableau.registerConnector(mySonarConnector);
+    $(document).ready(onLoad);
 })(jQuery, tableau);
