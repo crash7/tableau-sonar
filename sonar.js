@@ -22,7 +22,8 @@
         timemachine: function generateTimeMachineSchema(projectKey, metrics) {
             var i;
             var template = {
-                id: 'timemachine__' + projectKey,
+                id: 'timemachine__' + projectKey.replace(/[^a-z0-9_]/gi, '_'),
+                internalkey: projectKey,
                 alias: 'TimeMachine - ' + projectKey,
                 columns: [
                     { id: 'date', dataType: tableau.dataTypeEnum.datetime }
@@ -116,8 +117,8 @@
         var processedId = table.tableInfo.id.split('__');
 
         sonarAPI = connectionData['sonar-url'] + sonarAPI;
-
-        dataRetrievers[processedId[0]](sonarAPI, processedId[1], connectionData, function(tableData) {
+        tableau.log(table.tableInfo.dummy)
+        dataRetrievers[processedId[0]](sonarAPI, table.tableInfo.internalkey, connectionData, function(tableData) {
             table.appendRows(tableData);
             doneCallback();
         });
