@@ -43,8 +43,16 @@
      */
     dataRetrievers = {
         authors: function retrieveAuthorsData(sonarAPI, projectKey, connectionData, callback) {
-            // TODO: support more that 500 authors, retrieve data recursively
-            $.getJSON(sonarAPI + 'issues/authors', { ps: 500 }, function(response) {
+            // TODO: support more that 100 authors, retrieve data recursively
+            if (connectionData['sonar-utoken']) {
+                $.ajaxSetup({
+                    headers : {   
+                        'Authorization' : 'Basic ' + btoa(connectionData['sonar-utoken'] + ':')
+                    }
+                });
+                console.log('Basic ' + btoa(connectionData['sonar-utoken'] + ':'))
+            }
+            $.getJSON(sonarAPI + 'issues/authors', { ps: 100 }, function(response) {
                 var collection = response.authors;
                 var tableData = [];
                 var i;
@@ -59,6 +67,14 @@
         },
 
         timemachine: function retrieveTimeMachineData(sonarAPI, projectKey, connectionData, callback) {
+            if (connectionData['sonar-utoken']) {
+                $.ajaxSetup({
+                    headers : {   
+                        'Authorization' : 'Basic ' + btoa(connectionData['sonar-utoken'] + ':')
+                    }
+                });
+                console.log('Basic ' + btoa(connectionData['sonar-utoken'] + ':'))
+            }
             $.getJSON(sonarAPI + 'timemachine/index', {
                 resource: projectKey,
                 metrics: connectionData.metrics.join(',')
@@ -160,7 +176,12 @@
 
             tableau.connectionName = 'Sonar WDC - ' + connectionData['sonar-url'];
             tableau.connectionData = JSON.stringify(connectionData);
-            tableau.submit();
+            console.log(connectionData)
+            // tableau.submit();
+
+            dataRetrievers.authors('http://localhost:4000/api/', 'foo', connectionData, (...r) => {
+                console.log(r)
+            })
         });
     }
 
